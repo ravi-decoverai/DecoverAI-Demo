@@ -1,8 +1,6 @@
 import openai
 import os
 
-import streamlit
-
 
 class Table:
     def __init__(self, name, columns):
