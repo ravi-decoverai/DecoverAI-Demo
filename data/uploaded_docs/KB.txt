@@ -1,8 +1,0 @@
-Q: How do I reset my password?
-A: To reset your password, click on the "Forgot password" link on the login page. Enter your email address and follow the instructions in the email that is sent to you.
-
-Q: How do I contact customer support?
-A: You can contact customer support by emailing support@example.com, or by calling 1-800-555-1212 during business hours.
-
-Q: What is your return policy?
-A: We offer a 30-day return policy for most products. If you are not satisfied with your purchase, please contact customer support for assistance.
