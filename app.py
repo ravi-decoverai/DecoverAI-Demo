@@ -68,7 +68,7 @@ if uploaded_file is not None:
         # Check if the array is empty
         if predictions:
             extracted_answer = predictions[0].extracted_answer
-            st.write(extracted_answer)
+            st.write(predictions[0].explanation)
 
 if df is not None:
     # Display only the first 5 rows of the DataFrame
