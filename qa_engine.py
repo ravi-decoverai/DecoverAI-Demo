@@ -7,7 +7,6 @@
 import os
 import re
 import openai
-import streamlit as st
 
 from haystack.document_stores import ElasticsearchDocumentStore
 from haystack.nodes import BM25Retriever, FARMReader
@@ -22,6 +21,34 @@ class Prediction:
         self.context = context
         self.extracted_answer = extracted_answer
         self.explanation = explanation
+
+
+def explain_answer(query, answer):
+    prompt = "The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, " \
+             "and very friendly.\n\nHuman: Hello, who are you?\nAI: I am an AI created by OpenAI. How can I help " \
+             "you " \
+             "today?\nHuman: Can you explain this answer \"" + answer + "\" to me in a way that I can understand? The " \
+                                                                        "question is \"" + query + "\"\nAI: "
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    response = openai.Completion.create(
+        model="text-davinci-003",
+        prompt=prompt,
+        temperature=0.9,
+        max_tokens=150,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0.6,
+        stop=[" Human:", " AI:"]
+    )
+    return response.choices[0].text
+
+
+def extract_sentence(text, word):
+    pattern = r"\b[A-Z][^\.!?]*\b" + word + r"\b[^\.!?]*[\.!?]"
+    matches = re.findall(pattern, text, re.IGNORECASE)
+    if matches:
+        return matches[0]
+    return ''
 
 
 class QAEngine:
@@ -39,13 +66,6 @@ class QAEngine:
         self.retriever = BM25Retriever(document_store=self.document_store)
         self.reader = FARMReader(model_name_or_path=self.model_name_or_path, use_gpu=True)
         self.pipe = ExtractiveQAPipeline(reader=self.reader, retriever=self.retriever)
-
-    def extract_sentence(self, text, word):
-        pattern = r"\b[A-Z][^\.!?]*\b" + word + r"\b[^\.!?]*[\.!?]"
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            return matches[0]
-        return ''
 
     def index_documents(self):
         # Step 1: Output file to be written to a directory.
@@ -73,32 +93,13 @@ class QAEngine:
 
         # Iterate over the answers and print them
         for answer in predictions['answers']:
-            extracted_sentence = self.extract_sentence(answer.context, answer.answer)
+            extracted_sentence = extract_sentence(answer.context, answer.answer)
             p = None
             if extracted_sentence:
-                explanation = self.explain_answer(query, extracted_sentence)
+                explanation = explain_answer(query, extracted_sentence)
                 p = Prediction(answer.answer, answer.score, answer.context, extracted_sentence, explanation)
             else:
-                explanation = self.explain_answer(query, answer.answer)
+                explanation = explain_answer(query, answer.answer)
                 p = Prediction(answer.answer, answer.score, answer.context, answer.answer, explanation)
             ans_predictions.append(p)
         return ans_predictions
-
-    def explain_answer(self, query, answer):
-        prompt = "The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, " \
-                 "and very friendly.\n\nHuman: Hello, who are you?\nAI: I am an AI created by OpenAI. How can I help " \
-                 "you " \
-                 "today?\nHuman: Can you explain this answer \"" + answer + "\" to me in a way that I can understand? The " \
-                                                                            "question is \"" + query + "\"\nAI: "
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=prompt,
-            temperature=0.9,
-            max_tokens=150,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0.6,
-            stop=[" Human:", " AI:"]
-        )
-        return response.choices[0].text
