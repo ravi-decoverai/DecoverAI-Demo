@@ -8,6 +8,24 @@ import sqldf
 from qa import get_query_from_openai, Table
 from qa_engine import QAEngine
 
+# Step 1: Initialize QAEngine
+qa = QAEngine()
+qa.index_documents()
+
+question = st.text_input("Ask a question to be answered from the uploaded document", "")
+st.write("You asked the question:", question)
+
+if st.button("Get Answer"):
+    predictions = qa.answer_question(question)
+    # Check if the array is empty
+    if predictions:
+        extracted_answer = predictions[0].extracted_answer
+        st.write(predictions[0].explanation)
+if st.button("Get Answer GPT-Index"):
+    response = qa.answer_from_gpt_index(question)
+    print(response)
+    st.write(response)
+
 # Upload the file using the file_uploader function.
 # It should accept csv, txt and pdf files.
 uploaded_file = st.file_uploader("Choose a file", type=["csv", "txt", "pdf"])
@@ -53,22 +71,10 @@ if uploaded_file is not None:
 
         with open("data/uploaded_docs/" + uploaded_file.name, "wb") as f:
             f.write(bytes_data)
-    # Instantiating the QAEngine
-    qa = QAEngine()
-    qa.index_documents()
 
-    # Make a call to OpenAI's API to get the answer to the question.
-    # The answer is a string.
-    # Detect if the user has pressed enter on th text box.
-    # If the user has pressed enter, then call the OpenAI API.
-    # If the user has not pressed enter, then do not call the OpenAI API.
-    question = st.text_input("Ask a question to be answered from the uploaded document", "")
-    if st.button("Get Answer"):
-        predictions = qa.answer_question(question)
-        # Check if the array is empty
-        if predictions:
-            extracted_answer = predictions[0].extracted_answer
-            st.write(predictions[0].explanation)
+
+
+
 
 if df is not None:
     # Display only the first 5 rows of the DataFrame

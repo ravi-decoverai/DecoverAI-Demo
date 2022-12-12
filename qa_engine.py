@@ -7,7 +7,8 @@
 import os
 import re
 import openai
-import streamlit as st
+import streamlit
+from gpt_index import GPTTreeIndex, SimpleDirectoryReader
 
 from haystack.document_stores import ElasticsearchDocumentStore
 from haystack.nodes import BM25Retriever, FARMReader
@@ -22,6 +23,14 @@ class Prediction:
         self.context = context
         self.extracted_answer = extracted_answer
         self.explanation = explanation
+
+
+def extract_sentence(text, word):
+    pattern = r"\b[A-Z][^\.!?]*\b" + word + r"\b[^\.!?]*[\.!?]"
+    matches = re.findall(pattern, text, re.IGNORECASE)
+    if matches:
+        return matches[0]
+    return ''
 
 
 class QAEngine:
@@ -40,12 +49,9 @@ class QAEngine:
         self.reader = FARMReader(model_name_or_path=self.model_name_or_path, use_gpu=True)
         self.pipe = ExtractiveQAPipeline(reader=self.reader, retriever=self.retriever)
 
-    def extract_sentence(self, text, word):
-        pattern = r"\b[A-Z][^\.!?]*\b" + word + r"\b[^\.!?]*[\.!?]"
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            return matches[0]
-        return ''
+        # Step 2: Index documents in GPTTreeIndex.
+        documents = SimpleDirectoryReader('data/uploaded_docs').load_data()
+        self.gpt_index = GPTTreeIndex(documents)
 
     def index_documents(self):
         # Step 1: Output file to be written to a directory.
@@ -66,6 +72,11 @@ class QAEngine:
         # Step 3: Now, let's write the dicts containing documents to our DB.
         self.document_store.write_documents(docs)
 
+    def answer_from_gpt_index(self, query):
+        streamlit.write("Searching in GPT index...")
+        response = self.gpt_index.query(query + "?", child_branch_factor=1)
+        return response
+
     def answer_question(self, query):
         predictions = self.reader.predict(query=query, documents=self.document_store.get_all_documents())
 
@@ -73,7 +84,7 @@ class QAEngine:
 
         # Iterate over the answers and print them
         for answer in predictions['answers']:
-            extracted_sentence = self.extract_sentence(answer.context, answer.answer)
+            extracted_sentence = extract_sentence(answer.context, answer.answer)
             p = None
             if extracted_sentence:
                 explanation = self.explain_answer(query, extracted_sentence)
