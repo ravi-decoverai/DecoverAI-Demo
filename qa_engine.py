@@ -10,6 +10,7 @@ import openai
 import streamlit
 from gpt_index import GPTTreeIndex, SimpleDirectoryReader
 
+
 from haystack.document_stores import ElasticsearchDocumentStore
 from haystack.nodes import BM25Retriever, FARMReader
 from haystack.pipelines import ExtractiveQAPipeline
@@ -23,6 +24,28 @@ class Prediction:
         self.context = context
         self.extracted_answer = extracted_answer
         self.explanation = explanation
+
+
+
+def explain_answer(query, answer):
+    prompt = "The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, " \
+             "and very friendly.\n\nHuman: Hello, who are you?\nAI: I am an AI created by OpenAI. How can I help " \
+             "you " \
+             "today?\nHuman: Can you explain this answer \"" + answer + "\" to me in a way that I can understand? The " \
+                                                                        "question is \"" + query + "\"\nAI: "
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    response = openai.Completion.create(
+        model="text-davinci-003",
+        prompt=prompt,
+        temperature=0.9,
+        max_tokens=150,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0.6,
+        stop=[" Human:", " AI:"]
+    )
+    return response.choices[0].text
+
 
 
 def extract_sentence(text, word):
@@ -49,9 +72,11 @@ class QAEngine:
         self.reader = FARMReader(model_name_or_path=self.model_name_or_path, use_gpu=True)
         self.pipe = ExtractiveQAPipeline(reader=self.reader, retriever=self.retriever)
 
+
         # Step 2: Index documents in GPTTreeIndex.
         documents = SimpleDirectoryReader('data/uploaded_docs').load_data()
         self.gpt_index = GPTTreeIndex(documents)
+
 
     def index_documents(self):
         # Step 1: Output file to be written to a directory.
@@ -87,29 +112,10 @@ class QAEngine:
             extracted_sentence = extract_sentence(answer.context, answer.answer)
             p = None
             if extracted_sentence:
-                explanation = self.explain_answer(query, extracted_sentence)
+                explanation = explain_answer(query, extracted_sentence)
                 p = Prediction(answer.answer, answer.score, answer.context, extracted_sentence, explanation)
             else:
-                explanation = self.explain_answer(query, answer.answer)
+                explanation = explain_answer(query, answer.answer)
                 p = Prediction(answer.answer, answer.score, answer.context, answer.answer, explanation)
             ans_predictions.append(p)
         return ans_predictions
-
-    def explain_answer(self, query, answer):
-        prompt = "The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, " \
-                 "and very friendly.\n\nHuman: Hello, who are you?\nAI: I am an AI created by OpenAI. How can I help " \
-                 "you " \
-                 "today?\nHuman: Can you explain this answer \"" + answer + "\" to me in a way that I can understand? The " \
-                                                                            "question is \"" + query + "\"\nAI: "
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=prompt,
-            temperature=0.9,
-            max_tokens=150,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0.6,
-            stop=[" Human:", " AI:"]
-        )
-        return response.choices[0].text
